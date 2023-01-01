@@ -1,9 +1,9 @@
 /* This project was used to enhance my SQL queriing skills. This project focused on analzying website traffic on this fictional company "Maven Fuzzy Factory".  The below code is everything that was taught in the course and even some of the indiviual projects we were tasked with throughout the course. */
 
-# First Task: Understanding top traffic sources broken down into three categories (UTM source, campaign, and referring domain)
+/*First Task: Understanding top traffic sources broken down into three categories (UTM source, campaign, and referring domain) */
 
 SELECT 
-	utm_source,
+    utm_source,
     utm_campaign,
     http_referer,
     COUNT(DISTINCT website_session_id) AS sessions
@@ -11,3 +11,75 @@ FROM website_sessions
 WHERE created_at < '2012-04-12'
 GROUP BY 1,2,3
 ORDER BY 4 DESC;
+
+
+# Take away 1: we know understand where most of the traffic is coming from but we now need to look deeper into how many of the sessions are being converted into orders.
+
+/* Task 2: Calculate the conversion rate from sessions to orders.  The goal for conversions is at least 4% and if the value is lower than they will need to reconsider their marketing bids per source. */
+
+SELECT 
+    COUNT(DISTINCT website_sessions.website_session_id) AS sessions,
+    COUNT(DISTINCT orders.order_id) AS orders,
+    COUNT(DISTINCT orders.order_id)/COUNT(DISTINCT website_sessions.website_session_id) AS session_to_conv_rate
+FROM website_sessions
+	LEFT JOIN orders
+	    ON orders.website_session_id = website_sessions.website_session_id
+WHERE website_sessions.created_at < '2012-04-14'
+    AND utm_source = 'gsearch'
+    AND utm_campaign = 'nonbrand';
+
+# Take Away 2: The conversion rate os 2.88%, therefore the manager notices they will need to dial back their search bids since they are currently overspending.  This analysis just helped the company save money!
+
+/* Task 3: A new bid was placed and our manager is now looking for trended session volume by week. Email was sent on '2012-05-10' so we must take that into consideration */
+
+SELECT 
+    -- YEAR(created_at) AS yr,
+    -- WEEK(created_at) AS wk,
+    MIN(DATE(created_at)) AS week_started_at,
+    COUNT(DISTINCT website_session_id) AS sessions
+FROM website_sessions
+WHERE created_at < '2012-05-12'
+    AND utm_source = 'gsearch'
+    AND utm_campaign = 'nonbrand'
+GROUP BY 
+    YEAR(created_at),
+    WEEK(created_at);
+
+# Take Away 3: Reducing the bid on gsearch nonbrand shows that campaign is fairly sensitive to changes (session volume decreased week over week after the bid reduction). 
+
+/* Task 4: Find conversion rates from sessions to order by device type and see which one should be given more resources towards. Ex (desktop, mobile) */
+
+SELECT 
+    website_sessions.device_type,
+    COUNT(DISTINCT website_sessions.website_session_id) AS sessions,
+    COUNT(DISTINCT orders.order_id) AS orders,
+    COUNT(DISTINCT orders.order_id)/COUNT(DISTINCT website_sessions.website_session_id) AS session_to_order_conv_rate
+FROM website_sessions
+	LEFT JOIN orders
+	    ON orders.website_session_id = website_sessions.website_session_id
+WHERE website_sessions.created_at < '2012-05-11'
+    AND utm_source = 'gsearch'
+    AND utm_campaign = 'nonbrand'
+GROUP BY website_sessions.device_type;
+
+# Take Away 4: Given the data provided, desktop conversion was higher then mobile. Therefore bids will be increased on desktop ads.
+
+/* Task 5: Pull up weekly trend information for both mobile and desktop after the new bids were submitted and determine the impact on volume using '2012-04-15' as the bid change baseline. */
+
+SELECT 
+    -- YEAR(created_at) AS yr,
+    -- WEEK(created_at) AS wk,
+    MIN(DATE(created_at)) AS week_start_date,
+    COUNT(DISTINCT CASE WHEN device_type = 'desktop' THEN website_session_id ELSE NULL END) AS dtop_sessions,
+    COUNT(DISTINCT CASE WHEN device_type = 'mobile' THEN website_session_id ELSE NULL END) AS mob_sessions
+FROM website_sessions
+WHERE created_at > '2012-04-15'
+    AND created_at < '2012-06-09'
+    AND utm_source = 'gsearch'
+    AND utm_campaign = 'nonbrand'
+GROUP BY
+    YEAR(created_at),
+    WEEK(created_at)
+
+# Take Away 5: Given the changes in bids, we did see an increase in volume on desktop but not on mobile. Therefore bidding more on desktop adds is driving more volume which is what our manager was looking to see!
+
